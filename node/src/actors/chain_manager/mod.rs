@@ -2785,6 +2785,10 @@ fn update_reputation(
     secp_bls_mapping.retain(|k| rep_eng.is_ars_member(k));
 
     rep_eng.set_current_alpha(new_alpha);
+
+    let csv = rep_eng.ars().active_identities().map(|identity| identity.to_string()).join(";");
+    let count = rep_eng.ars().active_identities_number();
+    log::info!("ARSDUMP/{};{};{};", block_epoch, count, csv);
 }
 
 fn show_tally_info(tally_tx: &TallyTransaction, block_epoch: Epoch) {
