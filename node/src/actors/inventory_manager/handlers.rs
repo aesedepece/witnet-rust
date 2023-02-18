@@ -411,13 +411,7 @@ mod tests {
         let block_number = 1;
         let block_proof = BlockEligibilityClaim::default();
         let collateral_minimum = 1_000_000_000;
-
-        let active_wips = ActiveWips {
-            active_wips: HashMap::default(),
-            block_epoch: 0,
-        };
-
-        // Build block with
+        let active_wips = ActiveWips::default();
 
         let (block_header, txns) = build_block(
             (&mut transaction_pool, &unspent_outputs_pool, &dr_pool),
