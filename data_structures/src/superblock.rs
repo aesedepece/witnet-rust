@@ -828,7 +828,7 @@ mod tests {
             default_hash,
             dr_merkle_root_1,
             0,
-            block.versioned_hash(ProtocolVersion::V1_6),
+            block.versioned_hash(ProtocolVersion::V1_7),
             default_hash,
             tally_merkle_root_1,
         );
@@ -896,7 +896,7 @@ mod tests {
             default_hash,
             expected_superblock_dr_root,
             0,
-            block_2.versioned_hash(ProtocolVersion::V1_6),
+            block_2.versioned_hash(ProtocolVersion::V1_7),
             default_hash,
             expected_superblock_tally_root,
         );
