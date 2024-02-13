@@ -54,7 +54,7 @@ where
         key: ISK,
         coins: Coins,
         epoch: Epoch,
-    ) -> Result<Stake<Address, Coins, Epoch, Power>, Address, Coins, Epoch>
+    ) -> StakingResult<Stake<Address, Coins, Epoch, Power>, Address, Coins, Epoch>
     where
         ISK: Into<StakeKey<Address>>,
     {
@@ -116,7 +116,7 @@ where
         key: ISK,
         capability: Capability,
         epoch: Epoch,
-    ) -> Result<Power, Address, Coins, Epoch>
+    ) -> StakingResult<Power, Address, Coins, Epoch>
     where
         ISK: Into<StakeKey<Address>>,
     {
@@ -153,7 +153,7 @@ where
         &mut self,
         key: ISK,
         coins: Coins,
-    ) -> Result<Coins, Address, Coins, Epoch>
+    ) -> StakingResult<Coins, Address, Coins, Epoch>
     where
         ISK: Into<StakeKey<Address>>,
     {
@@ -194,7 +194,7 @@ where
         key: ISK,
         capability: Capability,
         current_epoch: Epoch,
-    ) -> Result<(), Address, Coins, Epoch>
+    ) -> StakingResult<(), Address, Coins, Epoch>
     where
         ISK: Into<StakeKey<Address>>,
     {

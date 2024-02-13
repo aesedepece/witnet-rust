@@ -6,8 +6,8 @@ use super::prelude::*;
 pub type SyncStake<Address, Coins, Epoch, Power> = Rc<RwLock<Stake<Address, Coins, Epoch, Power>>>;
 
 /// The resulting type for all the fallible functions in this module.
-pub type Result<T, Address, Coins, Epoch> =
-    std::result::Result<T, StakesError<Address, Coins, Epoch>>;
+pub type StakingResult<T, Address, Coins, Epoch> =
+    Result<T, StakesError<Address, Coins, Epoch>>;
 
 /// Couples a validator address with a withdrawer address together. This is meant to be used in `Stakes` as the index
 /// for the `by_key` index.
