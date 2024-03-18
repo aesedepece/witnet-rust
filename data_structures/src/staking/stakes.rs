@@ -61,7 +61,7 @@ where
         key: ISK,
         coins: Coins,
         epoch: Epoch,
-    ) -> StakingResult<Stake<Address, Coins, Epoch, Power>, Address, Coins, Epoch>
+    ) -> StakesResult<Stake<Address, Coins, Epoch, Power>, Address, Coins, Epoch>
     where
         ISK: Into<StakeKey<Address>>,
     {
@@ -86,6 +86,11 @@ where
         self.by_coins.insert(key, stake.clone());
 
         Ok(stake.value.read()?.clone())
+    }
+
+    /// Quickly count how many stake entries are recorded into this data structure.
+    pub fn stakes_count(&self) -> usize {
+        self.by_key.len()
     }
 
     /// Obtain a list of stakers, conveniently ordered by one of several strategies.
@@ -124,7 +129,7 @@ where
         key: ISK,
         capability: Capability,
         epoch: Epoch,
-    ) -> StakingResult<Power, Address, Coins, Epoch>
+    ) -> StakesResult<Power, Address, Coins, Epoch>
     where
         ISK: Into<StakeKey<Address>>,
     {
@@ -141,6 +146,9 @@ where
 
     /// For a given capability, obtain the full list of stakers ordered by their power in that
     /// capability.
+    /// TODO: we may memoize the rank by keeping the last one in a non-serializable field in `Self` that keeps a boxed
+    ///  iterator, so that this method doesn't have to sort multiple times if we are calling the `rank` method several
+    ///  times in the same epoch.
     pub fn rank(
         &self,
         capability: Capability,
@@ -163,7 +171,7 @@ where
         &mut self,
         key: ISK,
         coins: Coins,
-    ) -> StakingResult<Coins, Address, Coins, Epoch>
+    ) -> StakesResult<Coins, Address, Coins, Epoch>
     where
         ISK: Into<StakeKey<Address>>,
     {
@@ -204,7 +212,7 @@ where
         key: ISK,
         capability: Capability,
         current_epoch: Epoch,
-    ) -> StakingResult<(), Address, Coins, Epoch>
+    ) -> StakesResult<(), Address, Coins, Epoch>
     where
         ISK: Into<StakeKey<Address>>,
     {
@@ -238,7 +246,7 @@ pub fn process_stake_transaction<Epoch, Power>(
     stakes: &mut Stakes<PublicKeyHash, Wit, Epoch, Power>,
     transaction: &StakeTransaction,
     epoch: Epoch,
-) -> StakingResult<(), PublicKeyHash, Wit, Epoch>
+) -> StakesResult<(), PublicKeyHash, Wit, Epoch>
 where
     Epoch: Copy + Default + Sub<Output = Epoch> + num_traits::Saturating + From<u32> + Debug,
     Power: Add<Output = Power> + Copy + Default + Div<Output = Power> + Ord + Debug,
