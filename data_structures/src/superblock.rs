@@ -455,24 +455,19 @@ impl SuperBlockState {
 
         self.update_ars_identities(ars_identities);
 
-        // Before updating the superblock_beacon, calculate the signing committee
-        let signing_committee = if let Some(ref sb) = sync_superblock {
-            calculate_superblock_signing_committee(
-                self.ars_previous_identities.clone(),
-                sb.signing_committee_length,
-                superblock_index,
-                self.current_superblock_beacon.hash_prev_block,
-                block_epoch,
-            )
+        let signing_committee_size = if let Some(ref sb) = sync_superblock {
+            sb.signing_committee_length
         } else {
-            calculate_superblock_signing_committee(
-                self.ars_previous_identities.clone(),
-                signing_committee_size,
-                superblock_index,
-                self.current_superblock_beacon.hash_prev_block,
-                block_epoch,
-            )
+            signing_committee_size
         };
+        // Before updating the superblock_beacon, calculate the signing committee
+        let signing_committee = calculate_superblock_signing_committee(
+            self.ars_previous_identities.clone(),
+            signing_committee_size,
+            superblock_index,
+            self.current_superblock_beacon.hash_prev_block,
+            block_epoch,
+        );
 
         // Override superblock signing committee during each of the different emergency periods
         let emergency_committee =
