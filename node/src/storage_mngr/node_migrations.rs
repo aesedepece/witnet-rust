@@ -94,6 +94,17 @@ fn migrate_chain_state_v4_to_v5(old_chain_state_bytes: &[u8]) -> Vec<u8> {
     .concat()
 }
 
+fn migrate_chain_state_v5_to_v6(old_chain_state_bytes: &[u8]) -> Vec<u8> {
+    /*let db_version: u32 = 6;
+    let db_version_bytes = db_version.to_le_bytes();
+
+    println!("{}", hex::encode(old_chain_state_bytes));
+
+    panic!("Let's avoid completing the v5 → v6 migration");*/
+
+    Vec::from(old_chain_state_bytes)
+}
+
 fn migrate_chain_state(mut bytes: Vec<u8>) -> Result<ChainState, anyhow::Error> {
     loop {
         let version = check_chain_state_version(&bytes);
@@ -120,15 +131,24 @@ fn migrate_chain_state(mut bytes: Vec<u8>) -> Result<ChainState, anyhow::Error> 
                 log::info!("Successfully migrated ChainState v3 to v4");
             }
             Ok(4) => {
-                // Migrate from v3 to v4
+                // Migrate from v4 to v5
                 bytes = migrate_chain_state_v4_to_v5(&bytes);
                 log::info!("Successfully migrated ChainState v4 to v5");
             }
+            /*Ok(5) => {
+                // Migrate from v5 to v6
+                bytes = migrate_chain_state_v5_to_v6(&bytes);
+                log::info!("Successfully migrated ChainState v5 (V2_0) to v6 (V2_1)");
+            }*/
             Ok(5) => {
                 // Latest version
                 // Skip the first 4 bytes because they are used to encode db_version
-                return match deserialize(&bytes[4..]) {
-                    Ok(v) => Ok(v),
+                return match deserialize::<ChainState>(&bytes[4..]) {
+                    Ok(v) => {
+                        println!("STAKES: {}", hex::encode(bincode::serialize(&v.stakes).unwrap()));
+
+                        Ok(v)
+                    },
                     Err(e) => Err(as_failure!(e)),
                 };
             }

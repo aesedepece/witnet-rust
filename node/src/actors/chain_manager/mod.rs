@@ -90,7 +90,7 @@ use witnet_data_structures::{
     radon_report::{RadonReport, ReportContext},
     register_protocol_version,
     staking::prelude::*,
-    superblock::{ARSIdentities, AddSuperBlockVote, SuperBlockConsensus},
+    superblock::{AddSuperBlockVote, SuperBlockConsensus, SuperblockCensus},
     transaction::{RevealTransaction, TallyTransaction, Transaction},
     types::{
         LastBeacon,
@@ -1997,30 +1997,9 @@ impl ChainManager {
                 }
 
                 let chain_info = act.chain_state.chain_info.as_ref().unwrap();
-                let reputation_engine = act.chain_state.reputation_engine.as_ref().unwrap();
                 let last_superblock_signed_by_bootstrap = last_superblock_signed_by_bootstrap(&chain_info.consensus_constants);
-
-                let ars_members =
-                    // Before reaching the epoch activity_period + collateral_age the bootstrap committee signs the superblock
-                    // collateral_age is measured in blocks instead of epochs, but this only means that the period in which
-                    // the bootstrap committee signs is at least epoch activity_period + collateral_age
-                    if let Some(ars_members) = in_emergency_period(superblock_index, get_environment()) {
-                        // Bootstrap committee
-                        ars_members
-                    } else if superblock_index >= last_superblock_signed_by_bootstrap {
-                        reputation_engine.get_rep_ordered_ars_list()
-                    } else {
-                        chain_info
-                            .consensus_constants
-                            .bootstrapping_committee
-                            .iter()
-                            .map(|add| add.parse().expect("Malformed bootstrapping committee"))
-                            .collect()
-                    };
-
-                // Get the list of members of the ARS with reputation greater than 0
-                // the list itself is ordered by decreasing reputation
-                let ars_identities = ARSIdentities::new(ars_members);
+                let epoch = act.current_epoch.unwrap();
+                let protocol_version = ProtocolVersion::from_epoch(epoch);
 
                 // After the second hard fork, the superblock committee size must be at least 50
                 let min_committee_size = if after_second_hard_fork(block_epoch, get_environment()) {
@@ -2030,21 +2009,72 @@ impl ChainManager {
                     1
                 };
 
-                // Committee size should decrease if sufficient epochs have elapsed since last confirmed superblock
-                let committee_size = current_committee_size_requirement(
-                    consensus_constants.superblock_signing_committee_size,
-                    act.chain_state.superblock_state.get_committee_length(),
-                    consensus_constants.superblock_committee_decreasing_period,
-                    consensus_constants.superblock_committee_decreasing_step,
-                    chain_info.highest_superblock_checkpoint.checkpoint,
-                    superblock_index,
-                    last_superblock_signed_by_bootstrap,
-                    min_committee_size,
-                );
+                let committee_size = if protocol_version < ProtocolVersion::V2_1 {
+                    // In V1_X and V2_0, committee size would decrease if sufficient epochs had
+                    // elapsed since last confirmed superblock, to maximize the chance of recovery
+                    current_committee_size_requirement(
+                        consensus_constants.superblock_signing_committee_size,
+                        act.chain_state.superblock_state.get_committee_length(),
+                        consensus_constants.superblock_committee_decreasing_period,
+                        consensus_constants.superblock_committee_decreasing_step,
+                        chain_info.highest_superblock_checkpoint.checkpoint,
+                        superblock_index,
+                        last_superblock_signed_by_bootstrap,
+                        min_committee_size,
+                    )
+                } else {
+                    // On the contrary, the recovery strategy of V2_1 leaves the committee size as
+                    // it is, but grows the length of the "activity window" lookup
+                    let half_the_validators = (act.chain_state.stakes.validator_count() / 2) as u32;
+                    let committee_size_from_config = consensus_constants.superblock_signing_committee_size;
+
+                    // Use the smallest of 1/2 of the validators, and whatever is in the config
+                    half_the_validators.min(committee_size_from_config)
+                };
+
+
+                let census_members =
+                    // Before reaching the epoch activity_period + collateral_age the bootstrap committee signs the superblock
+                    // collateral_age is measured in blocks instead of epochs, but this only means that the period in which
+                    // the bootstrap committee signs is at least epoch activity_period + collateral_age
+                    if let Some(rescue_committee_members) = in_emergency_period(superblock_index, get_environment()) {
+                        // Rescue committee as census
+                        rescue_committee_members
+                    } else if superblock_index < last_superblock_signed_by_bootstrap {
+                        // Bootstrap committee as census
+                        chain_info
+                            .consensus_constants
+                            .bootstrapping_committee
+                            .iter()
+                            .map(|add| add.parse().expect("Malformed bootstrapping committee"))
+                            .collect()
+                    } else {
+                        // Regular census selection
+                        if protocol_version < ProtocolVersion::V2_1 {
+                            // V1_X sourced the census from the reputation engine (and V2_0 too, although it used a rescue committee)
+                            let reputation_engine = act.chain_state.reputation_engine.as_ref().unwrap();
+
+                            reputation_engine.get_rep_ordered_ars_list()
+                        } else {
+                            // V2_1 sources the census from the stakes tracker
+                            let stakes_tracker = &act.chain_state.stakes;
+                            //let activity_window = committee_size;
+
+                            stakes_tracker
+                                .census(Capability::Mining, epoch, CensusStrategy::All)
+                                //.filter(|entry| true) // TODO: actually filter by fresh activity
+                                .map(|entry| entry.validator)
+                                .dedup()
+                                .sorted()
+                                .collect()
+                        }
+                    };
+
+                let census = SuperblockCensus::new(census_members);
 
                 let superblock = act.chain_state.superblock_state.build_superblock(
                     &block_headers,
-                    ars_identities,
+                    census,
                     committee_size,
                     superblock_index,
                     last_hash,

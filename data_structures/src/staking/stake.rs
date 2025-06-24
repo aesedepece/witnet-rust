@@ -26,6 +26,9 @@ where
     /// attacks and other potential issues that may arise from the lack of inputs in unstake
     /// transactions.
     pub nonce: Nonce,
+    /// The most recent epoch in which this entry has gotten a block accepted.
+    #[serde(skip)]
+    pub latest_active: Epoch,
     /// This phantom field is here just for the sake of specifying generics.
     #[serde(skip)]
     pub phantom_address: PhantomData<Address>,

@@ -4899,7 +4899,7 @@ mod tests {
 
     use crate::{
         proto::versioning::{ProtocolVersion, VersionedHashable},
-        superblock::{ARSIdentities, mining_build_superblock},
+        superblock::{SuperblockCensus, mining_build_superblock},
         transaction::{CommitTransactionBody, RevealTransactionBody, VTTransactionBody},
     };
 
@@ -6842,7 +6842,7 @@ mod tests {
 
         let expected_order = vec![p1_bls, p2_bls, p3_bls];
         let ordered_identities = rep_engine.get_rep_ordered_ars_list();
-        let ars_identities = ARSIdentities::new(ordered_identities);
+        let ars_identities = SuperblockCensus::new(ordered_identities);
 
         assert_eq!(
             expected_order,
@@ -6884,7 +6884,7 @@ mod tests {
 
         let expected_order = vec![p1_bls, p2_bls, p3_bls];
         let ordered_identities = rep_engine.get_rep_ordered_ars_list();
-        let ars_identities = ARSIdentities::new(ordered_identities);
+        let ars_identities = SuperblockCensus::new(ordered_identities);
 
         assert_eq!(
             expected_order,
@@ -6942,7 +6942,7 @@ mod tests {
 
         let expected_order = vec![p1_bls, p2_bls, p4_bls, p5_bls, p3_bls];
         let ordered_identities = rep_engine.get_rep_ordered_ars_list();
-        let ars_identities = ARSIdentities::new(ordered_identities);
+        let ars_identities = SuperblockCensus::new(ordered_identities);
 
         assert_eq!(
             expected_order,

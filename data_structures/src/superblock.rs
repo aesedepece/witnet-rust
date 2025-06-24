@@ -79,14 +79,14 @@ pub enum SuperBlockConsensus {
 
 /// ARS identities
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ARSIdentities {
+pub struct SuperblockCensus {
     // HashSet of the identities in a specific ARS
     identities: HashSet<PublicKeyHash>,
     // Ordered vector of the identities in a specific ARS
     ordered_identities: Vec<PublicKeyHash>,
 }
 
-impl ARSIdentities {
+impl SuperblockCensus {
     pub fn len(&self) -> usize {
         self.identities.len()
     }
@@ -96,7 +96,7 @@ impl ARSIdentities {
     }
 
     pub fn new(ordered_identities: Vec<PublicKeyHash>) -> Self {
-        ARSIdentities {
+        SuperblockCensus {
             identities: ordered_identities.iter().cloned().collect(),
             ordered_identities,
         }
@@ -252,9 +252,9 @@ impl SuperBlockVotesMempool {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SuperBlockState {
     // Structure of the current Active Reputation Set identities
-    ars_current_identities: ARSIdentities,
+    ars_current_identities: SuperblockCensus,
     // Structure of the previous Active Reputation Set identities
-    ars_previous_identities: ARSIdentities,
+    ars_previous_identities: SuperblockCensus,
     /// The most recently created superblock. This one is yet to be voted and decided upon.
     current_superblock: Option<SuperBlock>,
     // Current superblock beacon including the superblock hash created by this node
@@ -272,8 +272,8 @@ impl SuperBlockState {
     pub fn new(superblock_genesis_hash: Hash, bootstrap_committee: Vec<PublicKeyHash>) -> Self {
         Self {
             signing_committee: bootstrap_committee.clone().into_iter().collect(),
-            ars_previous_identities: ARSIdentities::new(bootstrap_committee.clone()),
-            ars_current_identities: ARSIdentities::new(bootstrap_committee),
+            ars_previous_identities: SuperblockCensus::new(bootstrap_committee.clone()),
+            ars_current_identities: SuperblockCensus::new(bootstrap_committee),
             current_superblock_beacon: CheckpointBeacon {
                 checkpoint: 0,
                 hash_prev_block: superblock_genesis_hash,
@@ -428,7 +428,7 @@ impl SuperBlockState {
         }
     }
 
-    fn update_ars_identities(&mut self, new_identities: ARSIdentities) {
+    fn update_ars_identities(&mut self, new_identities: SuperblockCensus) {
         self.ars_previous_identities = std::mem::take(&mut self.ars_current_identities);
         self.ars_current_identities = new_identities;
     }
@@ -442,7 +442,7 @@ impl SuperBlockState {
     pub fn build_superblock(
         &mut self,
         block_headers: &[BlockHeader],
-        ars_identities: ARSIdentities,
+        ars_identities: SuperblockCensus,
         signing_committee_size: u32,
         superblock_index: u32,
         last_block_in_previous_superblock: Hash,
@@ -623,7 +623,7 @@ impl SuperBlockState {
 /// Calculates the superblock signing committee for a given superblock hash and ars
 #[allow(clippy::cast_possible_truncation)]
 pub fn calculate_superblock_signing_committee(
-    ars_identities: ARSIdentities,
+    ars_identities: SuperblockCensus,
     signing_committee_size: u32,
     current_superblock_index: u32,
     superblock_hash: Hash,
@@ -1030,7 +1030,7 @@ mod tests {
 
         let sb1 = sbs.build_superblock(
             &block_headers,
-            ARSIdentities::new(ars2),
+            SuperblockCensus::new(ars2),
             100,
             0,
             Hash::default(),
@@ -1079,7 +1079,7 @@ mod tests {
         let block_headers = vec![BlockHeader::default()];
         let pkhs = vec![create_pkh(1)];
         let keys = vec![create_bn256(1)];
-        let ars_identities = ARSIdentities::new(pkhs.clone());
+        let ars_identities = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, keys);
         let genesis_hash = Hash::default();
         let sb1 = sbs.build_superblock(
@@ -1110,7 +1110,7 @@ mod tests {
         let genesis_hash = Hash::default();
         let pkhs = vec![create_pkh(1)];
         let keys = vec![create_bn256(1)];
-        let ars_identities = ARSIdentities::new(pkhs.clone());
+        let ars_identities = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, keys);
 
         let first_superblock = sbs.build_superblock(
@@ -1149,7 +1149,7 @@ mod tests {
                 checkpoint: 0,
                 hash_prev_block: expected_superblock_hash,
             },
-            ars_previous_identities: ARSIdentities::default(),
+            ars_previous_identities: SuperblockCensus::default(),
             ..Default::default()
         };
         assert_eq!(sbs, expected_sbs);
@@ -1162,7 +1162,7 @@ mod tests {
         let block_headers = vec![BlockHeader::default()];
         let pkhs = vec![create_pkh(1)];
         let keys = vec![create_bn256(1)];
-        let ars_identities = ARSIdentities::new(pkhs.clone());
+        let ars_identities = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, keys);
 
         let genesis_hash = Hash::default();
@@ -1231,7 +1231,7 @@ mod tests {
         let block_headers = vec![BlockHeader::default()];
         let pkhs = vec![create_pkh(1)];
         let keys = vec![create_bn256(1)];
-        let ars_identities = ARSIdentities::new(pkhs.clone());
+        let ars_identities = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, keys);
 
         let genesis_hash = Hash::default();
@@ -1288,9 +1288,9 @@ mod tests {
         let p1 = PublicKey::from_bytes([1; 33]);
         let pkhs = vec![p1.pkh()];
         let keys = vec![create_bn256(1)];
-        let ars0 = ARSIdentities::new(vec![]);
-        let ars1 = ARSIdentities::new(pkhs.clone());
-        let ars2 = ARSIdentities::new(pkhs.clone());
+        let ars0 = SuperblockCensus::new(vec![]);
+        let ars1 = SuperblockCensus::new(pkhs.clone());
+        let ars2 = SuperblockCensus::new(pkhs.clone());
 
         let alt_keys = create_alt_keys(pkhs, keys);
 
@@ -1351,9 +1351,9 @@ mod tests {
         let p1 = PublicKey::from_bytes([1; 33]);
         let pkhs = vec![p1.pkh()];
         let keys = vec![create_bn256(1)];
-        let ars0 = ARSIdentities::new(vec![]);
-        let ars1 = ARSIdentities::new(pkhs.clone());
-        let ars2 = ARSIdentities::new(pkhs.clone());
+        let ars0 = SuperblockCensus::new(vec![]);
+        let ars1 = SuperblockCensus::new(pkhs.clone());
+        let ars2 = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, keys);
 
         // Superblock votes for index 0 cannot be validated because we do not know the ARS for index -1
@@ -1414,9 +1414,9 @@ mod tests {
         let p1 = PublicKey::from_bytes([1; 33]);
         let pkhs = vec![p1.pkh()];
         let keys = vec![create_bn256(1)];
-        let ars0 = ARSIdentities::new(vec![]);
-        let ars1 = ARSIdentities::new(pkhs.clone());
-        let ars2 = ARSIdentities::new(pkhs.clone());
+        let ars0 = SuperblockCensus::new(vec![]);
+        let ars1 = SuperblockCensus::new(pkhs.clone());
+        let ars2 = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, keys);
 
         // Superblock votes for index 0 cannot be validated because we do not know the ARS for index -1
@@ -1477,9 +1477,9 @@ mod tests {
         let p1 = PublicKey::from_bytes([1; 33]);
         let pkhs = vec![p1.pkh()];
         let keys = vec![create_bn256(1)];
-        let ars0 = ARSIdentities::new(vec![]);
-        let ars1 = ARSIdentities::new(pkhs.clone());
-        let ars2 = ARSIdentities::new(pkhs.clone());
+        let ars0 = SuperblockCensus::new(vec![]);
+        let ars1 = SuperblockCensus::new(pkhs.clone());
+        let ars2 = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, keys);
 
         // Superblock votes for index 0 cannot be validated because we do not know the ARS for index -1
@@ -1554,11 +1554,11 @@ mod tests {
         let p2 = PublicKey::from_bytes([2; 33]);
         let p3 = PublicKey::from_bytes([3; 33]);
 
-        let ars0 = ARSIdentities::new(vec![]);
-        let ars1 = ARSIdentities::new(vec![p1.pkh()]);
-        let ars2 = ARSIdentities::new(vec![p2.pkh()]);
-        let ars3 = ARSIdentities::new(vec![p3.pkh()]);
-        let ars4 = ARSIdentities::new(vec![]);
+        let ars0 = SuperblockCensus::new(vec![]);
+        let ars1 = SuperblockCensus::new(vec![p1.pkh()]);
+        let ars2 = SuperblockCensus::new(vec![p2.pkh()]);
+        let ars3 = SuperblockCensus::new(vec![p3.pkh()]);
+        let ars4 = SuperblockCensus::new(vec![]);
         let pkhs = vec![p1.pkh(), p2.pkh(), p3.pkh()];
         let keys = vec![create_bn256(1), create_bn256(2), create_bn256(3)];
         let alt_keys = create_alt_keys(pkhs, keys);
@@ -1709,7 +1709,7 @@ mod tests {
 
         let pkhs = vec![p1.pkh(), p2.pkh(), p3.pkh()];
         let keys = vec![create_bn256(1), create_bn256(2), create_bn256(3)];
-        let ars_identities = ARSIdentities::new(pkhs.clone());
+        let ars_identities = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, keys);
 
         let create_votes = |superblock_hash, superblock_index| {
@@ -1840,9 +1840,9 @@ mod tests {
         ];
         let alt_keys = create_alt_keys(pkhs1.clone(), keys);
 
-        let ars0 = ARSIdentities::new(pkhs0);
-        let ars1 = ARSIdentities::new(pkhs1);
-        let ars2 = ARSIdentities::new(pkhs2);
+        let ars0 = SuperblockCensus::new(pkhs0);
+        let ars1 = SuperblockCensus::new(pkhs1);
+        let ars2 = SuperblockCensus::new(pkhs2);
 
         let create_votes = |superblock_hash, superblock_index| {
             let mut v1 = SuperBlockVote::new_unsigned(superblock_hash, superblock_index);
@@ -1969,7 +1969,7 @@ mod tests {
 
         let pkhs = vec![p1.pkh(), p2.pkh(), p3.pkh()];
         let keys = vec![create_bn256(1), create_bn256(2), create_bn256(3)];
-        let ars_identities = ARSIdentities::new(pkhs.clone());
+        let ars_identities = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, keys);
 
         let block_headers = vec![BlockHeader::default()];
@@ -2059,7 +2059,7 @@ mod tests {
 
         let pkhs = vec![p1.pkh(), p2.pkh(), p3.pkh()];
         let keys = vec![create_bn256(1), create_bn256(2), create_bn256(3)];
-        let ars_identities = ARSIdentities::new(pkhs.clone());
+        let ars_identities = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, keys);
 
         let block_headers = vec![BlockHeader::default()];
@@ -2138,7 +2138,7 @@ mod tests {
         let block_headers = vec![BlockHeader::default()];
         let pkhs = vec![create_pkh(1)];
         let keys = vec![create_bn256(1)];
-        let ars_identities = ARSIdentities::new(pkhs.clone());
+        let ars_identities = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, keys);
 
         let genesis_hash = Hash::default();
@@ -2167,7 +2167,7 @@ mod tests {
         let block_headers = vec![BlockHeader::default()];
         let pkhs = vec![create_pkh(1)];
         let keys = vec![create_bn256(1)];
-        let ars_identities = ARSIdentities::new(pkhs.clone());
+        let ars_identities = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, keys);
 
         let genesis_hash = Hash::default();
@@ -2220,7 +2220,7 @@ mod tests {
             create_bn256(3),
             create_bn256(4),
         ];
-        let ars_identities = ARSIdentities::new(pkhs.clone());
+        let ars_identities = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, keys);
 
         let block_headers = vec![BlockHeader::default()];
@@ -2302,7 +2302,7 @@ mod tests {
 
         let pkhs = vec![p1.pkh(), p2.pkh(), p3.pkh()];
         let keys = vec![create_bn256(1), create_bn256(2), create_bn256(3)];
-        let ars_identities = ARSIdentities::new(pkhs.clone());
+        let ars_identities = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, keys);
 
         let block_headers = vec![BlockHeader::default()];
@@ -2347,7 +2347,7 @@ mod tests {
             create_bn256(4),
             create_bn256(5),
         ];
-        let ars = ARSIdentities::new(pkhs.clone());
+        let ars = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, keys);
 
         sbs.ars_current_identities = ars.clone();
@@ -2422,7 +2422,7 @@ mod tests {
             p7.pkh(),
             p8.pkh(),
         ];
-        let ars_identities = ARSIdentities::new(pkhs.clone());
+        let ars_identities = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, vec![]);
 
         let block_headers = vec![BlockHeader::default()];
@@ -2468,7 +2468,7 @@ mod tests {
         let p3 = PublicKey::from_bytes([3; 33]);
 
         let pkhs = vec![p1.pkh(), p2.pkh(), p3.pkh()];
-        let ars_identities = ARSIdentities::new(pkhs.clone());
+        let ars_identities = SuperblockCensus::new(pkhs.clone());
         let alt_keys = create_alt_keys(pkhs, vec![]);
 
         let block_headers = vec![BlockHeader::default()];
@@ -2649,12 +2649,12 @@ mod tests {
     #[test]
     fn test_get_beacon_2() {
         let superblock_state = SuperBlockState {
-            ars_current_identities: ARSIdentities::default(),
+            ars_current_identities: SuperblockCensus::default(),
             current_superblock_beacon: CheckpointBeacon {
                 checkpoint: 0,
                 hash_prev_block: Hash::SHA256([1; 32]),
             },
-            ars_previous_identities: ARSIdentities::default(),
+            ars_previous_identities: SuperblockCensus::default(),
             ..Default::default()
         };
         let beacon = superblock_state.get_beacon();
@@ -2671,12 +2671,12 @@ mod tests {
     #[test]
     fn test_get_beacon_3() {
         let superblock_state = SuperBlockState {
-            ars_current_identities: ARSIdentities::default(),
+            ars_current_identities: SuperblockCensus::default(),
             current_superblock_beacon: CheckpointBeacon {
                 checkpoint: 1,
                 hash_prev_block: Hash::default(),
             },
-            ars_previous_identities: ARSIdentities::default(),
+            ars_previous_identities: SuperblockCensus::default(),
             ..Default::default()
         };
         let beacon = superblock_state.get_beacon();
@@ -2727,9 +2727,9 @@ mod tests {
             create_bn256(4),
             create_bn256(5),
         ];
-        let ars0 = ARSIdentities::new(vec![]);
-        let ars1 = ARSIdentities::new(pkhs.clone());
-        let ars2 = ARSIdentities::new(pkhs.clone());
+        let ars0 = SuperblockCensus::new(vec![]);
+        let ars1 = SuperblockCensus::new(pkhs.clone());
+        let ars2 = SuperblockCensus::new(pkhs.clone());
 
         let alt_keys = create_alt_keys(pkhs, keys);
 

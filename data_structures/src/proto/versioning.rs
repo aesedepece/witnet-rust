@@ -182,18 +182,20 @@ impl IntoIterator for VersionsMap {
 )]
 pub enum ProtocolVersion {
     /// The original Witnet protocol.
-    // TODO: update this default once 2.0 is completely active
-    #[default]
     V1_7,
     /// The transitional protocol based on 1.x but with staking enabled.
     V1_8,
     /// The final Witnet 2.0 protocol.
+    // TODO: update this default once 2.1 is completely active
+    #[default]
     V2_0,
+    /// The updated Witnet 2.1 protocol adding delegated staking and improved security.
+    V2_1,
 }
 
 impl ProtocolVersion {
     pub const MIN: Self = ProtocolVersion::V1_7;
-    pub const MAX: Self = ProtocolVersion::V2_0;
+    pub const MAX: Self = ProtocolVersion::V2_1;
     pub fn guess() -> Self {
         Self::from_epoch_opt(None)
     }
@@ -211,12 +213,14 @@ impl ProtocolVersion {
     pub fn next(&self) -> Self {
         match self {
             ProtocolVersion::V1_7 => ProtocolVersion::V1_8,
-            _ => ProtocolVersion::V2_0,
+            ProtocolVersion::V1_8 => ProtocolVersion::V2_0,
+            _ => ProtocolVersion::V2_1,
         }
     }
 
     pub fn prev(&self) -> Self {
         match self {
+            ProtocolVersion::V2_1 => ProtocolVersion::V2_0,
             ProtocolVersion::V2_0 => ProtocolVersion::V1_8,
             _ => ProtocolVersion::V1_7,
         }
@@ -235,11 +239,15 @@ impl PartialOrd for ProtocolVersion {
             (x, y) if x == y => Ordering::Equal,
             // V1_7 is the lowest version
             (V1_7, _) => Ordering::Less,
-            // V2_0 is the highest version
-            (V2_0, _) => Ordering::Greater,
+            // V2_1 is the highest version
+            (V2_1, _) => Ordering::Greater,
             // Versions that are not the lowest or the highest need explicit comparisons
             (V1_8, V1_7) => Ordering::Greater,
             (V1_8, V2_0) => Ordering::Less,
+            (V1_8, V2_1) => Ordering::Less,
+            (V2_0, V1_7) => Ordering::Greater,
+            (V2_0, V1_8) => Ordering::Greater,
+            (V2_0, V2_1) => Ordering::Less,
             // the compiler doesn't know, but this is actually unreachable if you think about it
             _ => {
                 unreachable!()
@@ -323,7 +331,7 @@ impl Versioned for crate::chain::BlockMerkleRoots {
             // Transition merkle roots need no transformation
             V1_8 => Box::new(pb),
             // Final merkle roots need to drop the mint hash
-            V2_0 => {
+            V2_0 | V2_1 => {
                 pb.set_mint_hash(Default::default());
 
                 Box::new(pb)
@@ -349,7 +357,7 @@ impl Versioned for crate::chain::BlockHeader {
             // Legacy block headers need to be rearranged
             V1_7 => Box::new(Self::LegacyType::from(pb)),
             // All other block headers need no transformation
-            V1_8 | V2_0 => Box::new(pb),
+            V1_8 | V2_0 | V2_1 => Box::new(pb),
         };
 
         Ok(versioned)
@@ -387,7 +395,7 @@ impl Versioned for Message {
 
         let versioned: Box<dyn protobuf::Message> = match version {
             V1_7 => Box::new(Self::LegacyType::from(pb)),
-            V1_8 | V2_0 => Box::new(pb),
+            V1_8 | V2_0 | V2_1 => Box::new(pb),
         };
 
         Ok(versioned)
