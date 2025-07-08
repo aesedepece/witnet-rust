@@ -11,14 +11,13 @@ use itertools::Itertools;
 use num_traits::Saturating;
 use serde::{Deserialize, Serialize};
 
+use super::prelude::*;
 use crate::{
     chain::{Epoch, PublicKeyHash},
     get_environment,
     transaction::{StakeTransaction, UnstakeTransaction},
     wit::{PrecisionLoss, WIT_DECIMAL_PLACES, Wit},
 };
-
-use super::prelude::*;
 
 /// Message for querying stakes
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -678,6 +677,21 @@ where
         }
     }
 
+    /// Make sure that stake metadata is upgraded to its latest version.
+    pub fn migrate(&mut self) {
+        if let Some(StakeMeta::V2_0) = self
+            .by_key
+            .iter()
+            .next()
+            .map(|(_, entry)| entry.value.read().unwrap().meta)
+        {
+            for (_, entry) in &self.by_key {
+                let mut value = entry.value.write().unwrap();
+                value.meta = value.meta.migrate();
+            }
+        }
+    }
+
     /// Query stakes by stake key.
     #[inline(always)]
     fn query_by_key(
@@ -1041,6 +1055,7 @@ mod tests {
                     witnessing: 100
                 },
                 100,
+                Default::default(),
             )
         );
 
@@ -1065,6 +1080,7 @@ mod tests {
                     witnessing: 166
                 },
                 300,
+                Default::default(),
             )
         );
         assert_eq!(
@@ -1096,6 +1112,7 @@ mod tests {
                     witnessing: 1_000
                 },
                 1_000,
+                Default::default(),
             )
         );
 
@@ -1380,6 +1397,7 @@ mod tests {
                         witnessing: 30
                     },
                     30,
+                    Default::default(),
                 )
             }])
         );
@@ -1396,6 +1414,7 @@ mod tests {
                         witnessing: 30
                     },
                     30,
+                    Default::default(),
                 )
             }])
         );
@@ -1420,6 +1439,7 @@ mod tests {
                         witnessing: 30
                     },
                     30,
+                    Default::default(),
                 )
             }])
         );

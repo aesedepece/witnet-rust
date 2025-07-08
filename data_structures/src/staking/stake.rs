@@ -1,9 +1,10 @@
-use std::fmt::{Debug, Display};
-use std::{marker::PhantomData, ops::*};
+use std::{
+    fmt::{Debug, Display},
+    {marker::PhantomData, ops::*},
+};
 
+use crate::{staking::meta::StakeMeta, wit::PrecisionLoss};
 use serde::{Deserialize, Serialize};
-
-use crate::wit::PrecisionLoss;
 
 use super::prelude::*;
 
@@ -26,9 +27,8 @@ where
     /// attacks and other potential issues that may arise from the lack of inputs in unstake
     /// transactions.
     pub nonce: Nonce,
-    /// The most recent epoch in which this entry has gotten a block accepted.
-    #[serde(skip)]
-    pub latest_active: Epoch,
+    /// Extensible structure for additional post-V2_0 fields
+    pub meta: StakeMeta<Epoch>,
     /// This phantom field is here just for the sake of specifying generics.
     #[serde(skip)]
     pub phantom_address: PhantomData<Address>,
@@ -134,11 +134,17 @@ where
     /// Construct a Stake entry from a number of coins and a capability map. This is only useful for
     /// tests.
     #[cfg(test)]
-    pub fn from_parts(coins: Coins, epochs: CapabilityMap<Epoch>, nonce: Nonce) -> Self {
+    pub fn from_parts(
+        coins: Coins,
+        epochs: CapabilityMap<Epoch>,
+        nonce: Nonce,
+        meta: StakeMeta<Epoch>,
+    ) -> Self {
         Self {
             coins,
             epochs,
             nonce,
+            meta,
             phantom_address: Default::default(),
             phantom_power: Default::default(),
         }

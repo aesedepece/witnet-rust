@@ -4,6 +4,8 @@
 pub mod errors;
 /// Auxiliary convenience types and data structures.
 pub mod helpers;
+/// Stakes metadata, as introduced with  protocol `V2_1`.
+pub mod meta;
 /// The data structure and related logic for stake entries.
 pub mod stake;
 /// The data structure and related logic for keeping track of multiple stake entries.
@@ -14,6 +16,7 @@ pub mod stakes;
 pub mod prelude {
     pub use super::errors::*;
     pub use super::helpers::*;
+    pub use super::meta::*;
     pub use super::stake::*;
     pub use super::stakes::*;
     pub use crate::capabilities::*;

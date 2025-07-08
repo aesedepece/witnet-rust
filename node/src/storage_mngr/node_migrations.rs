@@ -1,3 +1,4 @@
+use memmem::{Searcher, TwoWaySearcher};
 use witnet_data_structures::{
     chain::{ChainState, tapi::TapiEngine},
     proto::versioning::ProtocolInfo,
@@ -95,14 +96,41 @@ fn migrate_chain_state_v4_to_v5(old_chain_state_bytes: &[u8]) -> Vec<u8> {
 }
 
 fn migrate_chain_state_v5_to_v6(old_chain_state_bytes: &[u8]) -> Vec<u8> {
-    /*let db_version: u32 = 6;
+    let db_version: u32 = 6;
     let db_version_bytes = db_version.to_le_bytes();
 
-    println!("{}", hex::encode(old_chain_state_bytes));
+    //FIXME use a regex for the search because this is not robust enough (different nodes might
+    // have their WIP hashmaps in different order so the marker will change)
+    let marker = hex::decode("5749503030323800862e00").unwrap();
+    let offset = TwoWaySearcher::new(&marker)
+        .search_in(old_chain_state_bytes)
+        .expect("The v5→v6 marker has not been found in the chain state bytes")
+        + marker.len()
+        + 8;
+    let count = (old_chain_state_bytes.len() - offset) / 108;
 
-    panic!("Let's avoid completing the v5 → v6 migration");*/
+    let entries = (0..count)
+        .into_iter()
+        .map(|i| {
+            let entry_start = offset + i * 104;
+            let entry_end = entry_start + 104;
+            let entry_bytes = &old_chain_state_bytes[entry_start..entry_end];
+            let extra_bytes = [0u8; 4].as_slice();
+            let migrated_bytes = [&entry_bytes, extra_bytes].concat();
+            println!("Entry #{} B: {}", i, hex::encode(&entry_bytes));
+            println!("Entry #{} A: {}", i, hex::encode(&migrated_bytes));
 
-    Vec::from(old_chain_state_bytes)
+            migrated_bytes
+        })
+        .collect::<Vec<_>>()
+        .concat();
+
+    [
+        &db_version_bytes,
+        &old_chain_state_bytes[4..offset],
+        &entries,
+    ]
+    .concat()
 }
 
 fn migrate_chain_state(mut bytes: Vec<u8>) -> Result<ChainState, anyhow::Error> {
@@ -135,20 +163,20 @@ fn migrate_chain_state(mut bytes: Vec<u8>) -> Result<ChainState, anyhow::Error> 
                 bytes = migrate_chain_state_v4_to_v5(&bytes);
                 log::info!("Successfully migrated ChainState v4 to v5");
             }
-            /*Ok(5) => {
+            Ok(5) => {
                 // Migrate from v5 to v6
                 bytes = migrate_chain_state_v5_to_v6(&bytes);
                 log::info!("Successfully migrated ChainState v5 (V2_0) to v6 (V2_1)");
-            }*/
-            Ok(5) => {
+            }
+            Ok(6) => {
                 // Latest version
                 // Skip the first 4 bytes because they are used to encode db_version
                 return match deserialize::<ChainState>(&bytes[4..]) {
-                    Ok(v) => {
-                        println!("STAKES: {}", hex::encode(bincode::serialize(&v.stakes).unwrap()));
+                    Ok(mut chain_state) => {
+                        chain_state.stakes.migrate();
 
-                        Ok(v)
-                    },
+                        Ok(chain_state)
+                    }
                     Err(e) => Err(as_failure!(e)),
                 };
             }
@@ -246,7 +274,7 @@ pub fn put_chain_state_in_batch<K>(
 where
     K: serde::Serialize + 'static,
 {
-    let db_version: u32 = 5;
+    let db_version: u32 = 6;
     // The first byte of the ChainState db_version must never be 0 or 1,
     // because that can be confused with version 0.
     assert!(db_version.to_le_bytes()[0] >= 2);

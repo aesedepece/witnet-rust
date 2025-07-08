@@ -523,7 +523,12 @@ mod test {
     fn test_cloning_assumptions() {
         let a = SyncStakeEntry::<0, String, u64, u64, u64, u64>::from(StakeEntry {
             key: Default::default(),
-            value: Stake::from_parts(123, Default::default(), Default::default()),
+            value: Stake::from_parts(
+                123,
+                Default::default(),
+                Default::default(),
+                Default::default(),
+            ),
         });
         let b = a.clone();
 

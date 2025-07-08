@@ -2544,6 +2544,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a282da65faaf38286cf3be983213fcf1d2e2a58700e808f83f4ea9a4804bc0"
 
 [[package]]
+name = "memmem"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a64a92489e2744ce060c349162be1c5f33c6969234104dbd99ddb5feb08b8c15"
+
+[[package]]
 name = "memoffset"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6290,6 +6296,7 @@ dependencies = [
  "jsonrpc-core 18.0.0",
  "jsonrpc-pubsub 18.0.0",
  "log 0.4.27",
+ "memmem",
  "num",
  "pin-project-lite",
  "rand 0.7.3",
