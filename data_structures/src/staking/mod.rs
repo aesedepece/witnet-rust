@@ -39,11 +39,17 @@ pub mod test {
             .unwrap();
 
         // Nobody holds any power just yet
-        let rank = stakes.by_rank(Capability::Mining, 0).collect::<Vec<_>>();
+        let rank = stakes
+            .by_rank(Capability::Mining, 0)
+            .map(|(entry, power)| (entry.key, power))
+            .collect::<Vec<_>>();
         assert_eq!(rank, vec![("Alpha".into(), 0)]);
 
         // One epoch later, Alpha starts to hold power
-        let rank = stakes.by_rank(Capability::Mining, 1).collect::<Vec<_>>();
+        let rank = stakes
+            .by_rank(Capability::Mining, 1)
+            .map(|(entry, power)| (entry.key, power))
+            .collect::<Vec<_>>();
         assert_eq!(rank, vec![("Alpha".into(), 2)]);
 
         // Beta stakes 5 @ epoch 10
@@ -52,13 +58,22 @@ pub mod test {
             .unwrap();
 
         // Alpha is still leading, but Beta has scheduled its takeover
-        let rank = stakes.by_rank(Capability::Mining, 10).collect::<Vec<_>>();
+        let rank = stakes
+            .by_rank(Capability::Mining, 10)
+            .map(|(entry, power)| (entry.key, power))
+            .collect::<Vec<_>>();
         assert_eq!(rank, vec![("Alpha".into(), 20), ("Beta".into(), 0)]);
 
         // Beta eventually takes over after epoch 16
-        let rank = stakes.by_rank(Capability::Mining, 16).collect::<Vec<_>>();
+        let rank = stakes
+            .by_rank(Capability::Mining, 16)
+            .map(|(entry, power)| (entry.key, power))
+            .collect::<Vec<_>>();
         assert_eq!(rank, vec![("Alpha".into(), 32), ("Beta".into(), 30)]);
-        let rank = stakes.by_rank(Capability::Mining, 17).collect::<Vec<_>>();
+        let rank = stakes
+            .by_rank(Capability::Mining, 17)
+            .map(|(entry, power)| (entry.key, power))
+            .collect::<Vec<_>>();
         assert_eq!(rank, vec![("Beta".into(), 35), ("Alpha".into(), 34)]);
 
         // Gamma should never take over, even in a million epochs, because it has only 1 coin
@@ -67,6 +82,7 @@ pub mod test {
             .unwrap();
         let rank = stakes
             .by_rank(Capability::Mining, 1_000_000)
+            .map(|(entry, power)| (entry.key, power))
             .collect::<Vec<_>>();
         assert_eq!(
             rank,
@@ -81,7 +97,10 @@ pub mod test {
         stakes
             .add_stake("Delta", 1_000, 50, true, MIN_STAKE_NANOWITS)
             .unwrap();
-        let rank = stakes.by_rank(Capability::Mining, 50).collect::<Vec<_>>();
+        let rank = stakes
+            .by_rank(Capability::Mining, 50)
+            .map(|(entry, power)| (entry.key, power))
+            .collect::<Vec<_>>();
         assert_eq!(
             rank,
             vec![
@@ -91,7 +110,10 @@ pub mod test {
                 ("Delta".into(), 0)
             ]
         );
-        let rank = stakes.by_rank(Capability::Mining, 51).collect::<Vec<_>>();
+        let rank = stakes
+            .by_rank(Capability::Mining, 51)
+            .map(|(entry, power)| (entry.key, power))
+            .collect::<Vec<_>>();
         assert_eq!(
             rank,
             vec![
@@ -106,7 +128,10 @@ pub mod test {
         stakes
             .remove_stake("Alpha", 2, 52, true, MIN_STAKE_NANOWITS)
             .unwrap();
-        let rank = stakes.by_rank(Capability::Mining, 51).collect::<Vec<_>>();
+        let rank = stakes
+            .by_rank(Capability::Mining, 51)
+            .map(|(entry, power)| (entry.key, power))
+            .collect::<Vec<_>>();
         assert_eq!(
             rank,
             vec![

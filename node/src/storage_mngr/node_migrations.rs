@@ -110,14 +110,13 @@ fn migrate_chain_state_v5_to_v6(old_chain_state_bytes: &[u8]) -> Vec<u8> {
     let count = (old_chain_state_bytes.len() - offset) / 108;
 
     let entries = (0..count)
-        .into_iter()
         .map(|i| {
             let entry_start = offset + i * 104;
             let entry_end = entry_start + 104;
             let entry_bytes = &old_chain_state_bytes[entry_start..entry_end];
             let extra_bytes = [0u8; 4].as_slice();
-            let migrated_bytes = [&entry_bytes, extra_bytes].concat();
-            println!("Entry #{} B: {}", i, hex::encode(&entry_bytes));
+            let migrated_bytes = [entry_bytes, extra_bytes].concat();
+            println!("Entry #{} B: {}", i, hex::encode(entry_bytes));
             println!("Entry #{} A: {}", i, hex::encode(&migrated_bytes));
 
             migrated_bytes

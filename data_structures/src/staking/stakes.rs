@@ -194,7 +194,8 @@ where
         + Serialize
         + Sync
         + Add<Output = Epoch>
-        + Div<Output = Epoch>,
+        + Div<Output = Epoch>
+        + std::cmp::PartialOrd,
     Nonce: AddAssign
         + Copy
         + Debug
@@ -284,9 +285,9 @@ where
         &self,
         capability: Capability,
         epoch: Epoch,
-        strategy: CensusStrategy,
-    ) -> Box<dyn Iterator<Item = StakeKey<Address>> + '_> {
-        let iterator = self.by_rank(capability, epoch).map(|(address, _)| address);
+        strategy: CensusStrategy<Epoch>,
+    ) -> Box<dyn Iterator<Item = StakeEntry<UNIT, Address, Coins, Epoch, Nonce, Power>> + '_> {
+        let iterator = self.by_rank(capability, epoch).map(|(entry, _)| entry);
 
         match strategy {
             CensusStrategy::All => Box::new(iterator),
@@ -298,6 +299,12 @@ where
 
                 Box::new(collected.into_iter().step_by(step).take(count))
             }
+            CensusStrategy::Active(freshness) => Box::new(iterator.filter(move |entry| {
+                let now = epoch;
+                let last_active = entry.value.meta.get_last_active();
+
+                now - last_active >= freshness
+            })),
         }
     }
 
@@ -335,21 +342,22 @@ where
         &self,
         capability: Capability,
         current_epoch: Epoch,
-    ) -> impl Iterator<Item = (StakeKey<Address>, Power)> + Clone + '_ {
+    ) -> impl Iterator<Item = (StakeEntry<UNIT, Address, Coins, Epoch, Nonce, Power>, Power)> + Clone + '_
+    {
         self.by_key
-            .iter()
-            .map(move |(key, entry)| {
+            .values()
+            .map(move |entry| {
                 (
-                    key.clone(),
+                    entry.read_entry(),
                     entry.read_value().power(capability, current_epoch),
                 )
             })
-            .sorted_by(|(key_1, power_1), (key_2, power_2)| {
+            .sorted_by(|(entry_1, power_1), (entry_2, power_2)| {
                 if power_1 == power_2 {
-                    if key_1.validator == key_2.validator {
-                        key_1.withdrawer.cmp(&key_2.withdrawer)
+                    if entry_1.key.validator == entry_2.key.validator {
+                        entry_1.key.withdrawer.cmp(&entry_2.key.withdrawer)
                     } else {
-                        key_1.validator.cmp(&key_2.validator)
+                        entry_1.key.validator.cmp(&entry_2.key.validator)
                     }
                 } else {
                     power_1.cmp(power_2)
@@ -453,11 +461,13 @@ where
         // locate first entry whose validator matches the one searched for:
         let winner_rank = by_rank
             .clone()
-            .position(|(key, _)| key.validator == validator);
+            .position(|(entry, _)| entry.key.validator == validator);
 
         if let Some(winner_rank) = winner_rank {
-            let stakers: Vec<StakeKey<Address>> =
-                by_rank.take(winner_rank + 1).map(|(key, _)| key).collect();
+            let stakers: Vec<StakeKey<Address>> = by_rank
+                .take(winner_rank + 1)
+                .map(|(entry, _)| entry.key)
+                .collect();
             // proportionally reset coin age on located entry and all those with a better mining rank:
             for (index, key) in stakers.iter().enumerate() {
                 let stake_entry = self.by_key.get_mut(key);
@@ -685,9 +695,8 @@ where
             .next()
             .map(|(_, entry)| entry.value.read().unwrap().meta)
         {
-            for (_, entry) in &self.by_key {
-                let mut value = entry.value.write().unwrap();
-                value.meta = value.meta.migrate();
+            for entry in self.by_key.values() {
+                entry.value.write().unwrap().meta.migrate();
             }
         }
     }
@@ -1195,7 +1204,10 @@ mod tests {
             Ok(2_100)
         );
         assert_eq!(
-            stakes.by_rank(Capability::Mining, 100).collect::<Vec<_>>(),
+            stakes
+                .by_rank(Capability::Mining, 100)
+                .map(|(entry, power)| (entry.key, power))
+                .collect::<Vec<_>>(),
             [
                 (charlie_erin.into(), 2100),
                 (bob_david.into(), 1600),
@@ -1205,6 +1217,7 @@ mod tests {
         assert_eq!(
             stakes
                 .by_rank(Capability::Witnessing, 100)
+                .map(|(entry, power)| (entry.key, power))
                 .collect::<Vec<_>>(),
             [
                 (charlie_erin.into(), 2100),
@@ -1236,7 +1249,10 @@ mod tests {
             Ok(2_130)
         );
         assert_eq!(
-            stakes.by_rank(Capability::Mining, 101).collect::<Vec<_>>(),
+            stakes
+                .by_rank(Capability::Mining, 101)
+                .map(|(entry, power)| (entry.key, power))
+                .collect::<Vec<_>>(),
             [
                 (bob_david.into(), 1_620),
                 (alice_charlie.into(), 1_010),
@@ -1246,6 +1262,7 @@ mod tests {
         assert_eq!(
             stakes
                 .by_rank(Capability::Witnessing, 101)
+                .map(|(entry, power)| (entry.key, power))
                 .collect::<Vec<_>>(),
             [
                 (charlie_erin.into(), 2_130),
@@ -1279,7 +1296,10 @@ mod tests {
             Ok(8_100)
         );
         assert_eq!(
-            stakes.by_rank(Capability::Mining, 300).collect::<Vec<_>>(),
+            stakes
+                .by_rank(Capability::Mining, 300)
+                .map(|(entry, power)| (entry.key, power))
+                .collect::<Vec<_>>(),
             [
                 (charlie_erin.into(), 5_970),
                 (bob_david.into(), 5_600),
@@ -1289,6 +1309,7 @@ mod tests {
         assert_eq!(
             stakes
                 .by_rank(Capability::Witnessing, 300)
+                .map(|(entry, power)| (entry.key, power))
                 .collect::<Vec<_>>(),
             [
                 (charlie_erin.into(), 8_100),
@@ -1336,7 +1357,11 @@ mod tests {
         //      charlie_david:  30 * (90 - 20) = 2100
         //      david_erin:     40 * (90 - 30) = 2400
         //      erin_alice:     50 * (90 - 40) = 2500
-        let rank_subset: Vec<_> = stakes.by_rank(Capability::Mining, 90).take(4).collect();
+        let rank_subset: Vec<_> = stakes
+            .by_rank(Capability::Mining, 90)
+            .map(|(entry, power)| (entry.key, power))
+            .take(4)
+            .collect();
         for (i, (validator, _)) in rank_subset.into_iter().enumerate() {
             let _ = stakes.reset_age(
                 validator.validator,
@@ -1647,7 +1672,10 @@ mod tests {
             .add_stake(david_charlie, 40, 10, true, MIN_STAKE_NANOWITS)
             .unwrap();
         assert_eq!(
-            stakes.by_rank(Capability::Mining, 30).collect::<Vec<_>>(),
+            stakes
+                .by_rank(Capability::Mining, 30)
+                .map(|(entry, power)| (entry.key, power))
+                .collect::<Vec<_>>(),
             [
                 (david_charlie.into(), 800),
                 (charlie_charlie.into(), 600),
@@ -1659,7 +1687,10 @@ mod tests {
         stakes.reset_mining_age(david, 30).unwrap();
 
         assert_eq!(
-            stakes.by_rank(Capability::Mining, 31).collect::<Vec<_>>(),
+            stakes
+                .by_rank(Capability::Mining, 31)
+                .map(|(entry, power)| (entry.key, power))
+                .collect::<Vec<_>>(),
             [
                 (charlie_charlie.into(), 630),
                 (bob_alice.into(), 620),
@@ -1669,7 +1700,10 @@ mod tests {
         );
 
         assert_eq!(
-            stakes.by_rank(Capability::Mining, 50).collect::<Vec<_>>(),
+            stakes
+                .by_rank(Capability::Mining, 50)
+                .map(|(entry, power)| (entry.key, power))
+                .collect::<Vec<_>>(),
             [
                 (charlie_charlie.into(), 1_200),
                 (bob_alice.into(), 1_000),
@@ -1681,7 +1715,10 @@ mod tests {
         stakes.reset_mining_age(david, 50).unwrap();
 
         assert_eq!(
-            stakes.by_rank(Capability::Mining, 51).collect::<Vec<_>>(),
+            stakes
+                .by_rank(Capability::Mining, 51)
+                .map(|(entry, power)| (entry.key, power))
+                .collect::<Vec<_>>(),
             [
                 (alice_alice.into(), 510),
                 (david_charlie.into(), 0),
@@ -1691,7 +1728,10 @@ mod tests {
         );
 
         assert_eq!(
-            stakes.by_rank(Capability::Mining, 52).collect::<Vec<_>>(),
+            stakes
+                .by_rank(Capability::Mining, 52)
+                .map(|(entry, power)| (entry.key, power))
+                .collect::<Vec<_>>(),
             [
                 (alice_alice.into(), 520),
                 (david_charlie.into(), 40),
@@ -1701,7 +1741,10 @@ mod tests {
         );
 
         assert_eq!(
-            stakes.by_rank(Capability::Mining, 53).collect::<Vec<_>>(),
+            stakes
+                .by_rank(Capability::Mining, 53)
+                .map(|(entry, power)| (entry.key, power))
+                .collect::<Vec<_>>(),
             [
                 (alice_alice.into(), 530),
                 (david_charlie.into(), 80),
@@ -1711,7 +1754,10 @@ mod tests {
         );
 
         assert_eq!(
-            stakes.by_rank(Capability::Mining, 54).collect::<Vec<_>>(),
+            stakes
+                .by_rank(Capability::Mining, 54)
+                .map(|(entry, power)| (entry.key, power))
+                .collect::<Vec<_>>(),
             [
                 (alice_alice.into(), 540),
                 (david_charlie.into(), 120),

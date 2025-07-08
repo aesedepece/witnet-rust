@@ -287,20 +287,22 @@ pub struct CoinsAndAddresses<Coins, Address> {
     pub addresses: StakeKey<Address>,
 }
 
-/// Allows telling the `census` method in `Stakes` to source addresses from its internal `by_coins`
-/// following different strategies.
+/// Allows telling the `census` method in `Stakes` to source entries following different strategies.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug)]
-pub enum CensusStrategy {
-    /// Retrieve all addresses, ordered by decreasing power.
+pub enum CensusStrategy<Epoch> {
+    /// Retrieve all entries, ordered by decreasing power.
     All = 0,
-    /// Retrieve every Nth address, ordered by decreasing power.
+    /// Retrieve every Nth entry, ordered by decreasing power.
     StepBy(usize) = 1,
-    /// Retrieve the most powerful N addresses, ordered by decreasing power.
+    /// Retrieve the most powerful N entries, ordered by decreasing power.
     Take(usize) = 2,
-    /// Retrieve a total of N addresses, evenly distributed from the index, ordered by decreasing
+    /// Retrieve a total of N entries, evenly distributed from the index, ordered by decreasing
     /// power.
     Evenly(usize) = 3,
+    /// Retrieve an unbounded number of entries, as long as they have been active in the last N
+    /// epochs.
+    Active(Epoch) = 4,
 }
 
 impl<const UNIT: u8, Address, Coins, Epoch, Nonce, Power> Serialize

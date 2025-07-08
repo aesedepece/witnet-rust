@@ -2058,12 +2058,11 @@ impl ChainManager {
                         } else {
                             // V2_1 sources the census from the stakes tracker
                             let stakes_tracker = &act.chain_state.stakes;
-                            //let activity_window = committee_size;
+                            let activity_window = committee_size;
 
                             stakes_tracker
-                                .census(Capability::Mining, epoch, CensusStrategy::All)
-                                //.filter(|entry| true) // TODO: actually filter by fresh activity
-                                .map(|entry| entry.validator)
+                                .census(Capability::Mining, epoch, CensusStrategy::Active(activity_window))
+                                .map(|entry| entry.key.validator)
                                 .dedup()
                                 .sorted()
                                 .collect()

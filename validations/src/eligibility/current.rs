@@ -184,7 +184,7 @@ where
             match self
                 .by_rank(Capability::Mining, epoch)
                 .take(replication_factor as usize)
-                .find(|(key, _)| key.validator == validator)
+                .find(|(entry, _)| entry.key.validator == validator)
             {
                 Some(_) => Eligible::Yes,
                 None => IneligibilityReason::InsufficientPower.into(),
