@@ -290,7 +290,7 @@ pub struct CoinsAndAddresses<Coins, Address> {
 /// Allows telling the `census` method in `Stakes` to source entries following different strategies.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug)]
-pub enum CensusStrategy<Epoch> {
+pub enum CensusStrategy {
     /// Retrieve all entries, ordered by decreasing power.
     All = 0,
     /// Retrieve every Nth entry, ordered by decreasing power.
@@ -300,9 +300,8 @@ pub enum CensusStrategy<Epoch> {
     /// Retrieve a total of N entries, evenly distributed from the index, ordered by decreasing
     /// power.
     Evenly(usize) = 3,
-    /// Retrieve an unbounded number of entries, as long as they have been active in the last N
-    /// epochs.
-    Active(Epoch) = 4,
+    /// Retrieve up to N entries, as long as they have been active in the last M epochs.
+    Active(usize) = 4,
 }
 
 impl<const UNIT: u8, Address, Coins, Epoch, Nonce, Power> Serialize
@@ -368,7 +367,8 @@ where
         + Sync
         + Add<Output = Epoch>
         + Div<Output = Epoch>
-        + PartialOrd,
+        + PartialOrd
+        + Ord,
     Nonce: AddAssign
         + Copy
         + Debug
@@ -453,7 +453,8 @@ where
         + Sync
         + Add<Output = Epoch>
         + Div<Output = Epoch>
-        + PartialOrd,
+        + PartialOrd
+        + Ord,
     Nonce: AddAssign
         + Copy
         + Debug

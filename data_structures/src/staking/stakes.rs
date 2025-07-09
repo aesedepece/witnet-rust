@@ -121,7 +121,8 @@ where
         + Sync
         + Add<Output = Epoch>
         + Div<Output = Epoch>
-        + PartialOrd,
+        + PartialOrd
+        + Ord,
     Nonce: AddAssign
         + Copy
         + Debug
@@ -195,7 +196,8 @@ where
         + Sync
         + Add<Output = Epoch>
         + Div<Output = Epoch>
-        + std::cmp::PartialOrd,
+        + PartialOrd
+        + Ord,
     Nonce: AddAssign
         + Copy
         + Debug
@@ -285,7 +287,7 @@ where
         &self,
         capability: Capability,
         epoch: Epoch,
-        strategy: CensusStrategy<Epoch>,
+        strategy: CensusStrategy,
     ) -> Box<dyn Iterator<Item = StakeEntry<UNIT, Address, Coins, Epoch, Nonce, Power>> + '_> {
         let iterator = self.by_rank(capability, epoch).map(|(entry, _)| entry);
 
@@ -299,12 +301,19 @@ where
 
                 Box::new(collected.into_iter().step_by(step).take(count))
             }
-            CensusStrategy::Active(freshness) => Box::new(iterator.filter(move |entry| {
-                let now = epoch;
-                let last_active = entry.value.meta.get_last_active();
+            CensusStrategy::Active(count) => Box::new(
+                iterator
+                    .map(|entry| {
+                        let latest_active = entry.value.meta.get_latest_active();
 
-                now - last_active >= freshness
-            })),
+                        (entry, latest_active)
+                    })
+                    .sorted_by_key(|(_, latest_active)| *latest_active)
+                    .rev()
+                    .dedup_by(|(a, _), (b, _)| a.key.validator == b.key.validator)
+                    .map(|(entry, _)| entry)
+                    .take(count),
+            ),
         }
     }
 
@@ -527,6 +536,34 @@ where
         Ok(())
     }
 
+    /// Update the V2_1 metadata for what was the last time that a validator got a block accepted.
+    pub fn update_latest_active<ISK>(
+        &mut self,
+        validator: ISK,
+        current_epoch: Epoch,
+    ) -> StakesResult<(), Address, Coins, Epoch>
+    where
+        ISK: Into<Address>,
+    {
+        let validator = validator.into();
+
+        let stakes = self
+            .by_validator
+            .get_mut(&validator)
+            .ok_or(StakesError::ValidatorNotFound { validator })?;
+
+        stakes.iter_mut().for_each(|stake| {
+            stake
+                .value
+                .write()
+                .unwrap()
+                .meta
+                .set_latest_active(current_epoch);
+        });
+
+        Ok(())
+    }
+
     /// Add a reward to the validator's balance
     pub fn add_reward<ISK>(
         &mut self,
@@ -695,8 +732,13 @@ where
             .next()
             .map(|(_, entry)| entry.value.read().unwrap().meta)
         {
+            log::info!(
+                "Stakes metadata is outdated. Migrating stakes metadata into its latest version."
+            );
+
             for entry in self.by_key.values() {
-                entry.value.write().unwrap().meta.migrate();
+                let mut guard = entry.value.write().unwrap();
+                guard.meta = guard.meta.migrate();
             }
         }
     }
@@ -817,7 +859,8 @@ where
         + Sync
         + Add<Output = Epoch>
         + Div<Output = Epoch>
-        + PartialOrd,
+        + PartialOrd
+        + Ord,
     Nonce: AddAssign
         + Copy
         + Debug
@@ -882,7 +925,8 @@ where
         + Sync
         + Add<Output = Epoch>
         + Div<Output = Epoch>
-        + PartialOrd,
+        + PartialOrd
+        + Ord,
     Nonce: AddAssign
         + Copy
         + Debug
@@ -944,7 +988,8 @@ where
         + Display
         + Add<Output = Epoch>
         + Div<Output = Epoch>
-        + PartialOrd,
+        + PartialOrd
+        + Ord,
     Nonce: AddAssign
         + Copy
         + Debug
@@ -990,7 +1035,8 @@ where
         + Display
         + Add<Output = Epoch>
         + Div<Output = Epoch>
-        + PartialOrd,
+        + PartialOrd
+        + Ord,
     Nonce: AddAssign
         + Copy
         + Debug

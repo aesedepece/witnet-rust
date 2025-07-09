@@ -2023,8 +2023,7 @@ impl ChainManager {
                         min_committee_size,
                     )
                 } else {
-                    // On the contrary, the recovery strategy of V2_1 leaves the committee size as
-                    // it is, but grows the length of the "activity window" lookup
+                    // On the contrary, V2_1 uses no recovery strategy for simplicity
                     let half_the_validators = (act.chain_state.stakes.validator_count() / 2) as u32;
                     let committee_size_from_config = consensus_constants.superblock_signing_committee_size;
 
@@ -2058,10 +2057,9 @@ impl ChainManager {
                         } else {
                             // V2_1 sources the census from the stakes tracker
                             let stakes_tracker = &act.chain_state.stakes;
-                            let activity_window = committee_size;
 
                             stakes_tracker
-                                .census(Capability::Mining, epoch, CensusStrategy::Active(activity_window))
+                                .census(Capability::Mining, block_epoch, CensusStrategy::Active(committee_size as usize))
                                 .map(|entry| entry.key.validator)
                                 .dedup()
                                 .sorted()
@@ -3198,6 +3196,9 @@ fn process_wit2_stakes_changes(
             block_epoch + 1
         );
         stakes.reset_mining_age(miner_pkh, block_epoch).unwrap();
+
+        log::info!("Updating latest activity for {miner_pkh}: {block_epoch}");
+        stakes.update_latest_active(miner_pkh, block_epoch).unwrap();
 
         // Reset witnessing power
         for co_tx in &block.txns.commit_txns {
